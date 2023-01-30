@@ -7,8 +7,9 @@ pipeline {
     }
 */
     environment {
-        registry = "imranvisualpath/vproappdock"
+	registry = "earlyspring/test"
         registryCredential = 'dockerhub'
+        DOCKERHUB_CREDENTIALS=credentials('dockerhub')
     }
 
     stages{
@@ -51,56 +52,41 @@ pipeline {
 
         stage('Building image') {
             steps{
-              script {
-                dockerImage = docker.build registry + ":$BUILD_NUMBER"
-              }
+              sh 'docker build -t earlyspring/test:V$BUILD_NUMBER .'
+	      sh 'docker build -t earlyspring/test:latest .'
             }
         }
+	    
+	stage('Docker Login'){
+		steps{
+		  sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
+		}
+	    }
         
         stage('Deploy Image') {
           steps{
-            script {
-              docker.withRegistry( '', registryCredential ) {
-                dockerImage.push("$BUILD_NUMBER")
-                dockerImage.push('latest')
-              }
-            }
+            sh 'docker push earlyspring/test:V$BUILD_NUMBER'
+            sh 'docker push earlyspring/test:latest'
           }
         }
+
 
         stage('Remove Unused docker image') {
           steps{
-            sh "docker rmi $registry:$BUILD_NUMBER"
+            sh "docker rmi $registry:V$BUILD_NUMBER" 
+	    sh "docker rmi $registry:latest" 
           }
+	}
+
+	 stage(kubernetes kops ) {
+	  steps{
+            sh 'kubectl apply -f . --namespace staging'
         }
+	   }
 
-        stage('CODE ANALYSIS with SONARQUBE') {
-
-            environment {
-                scannerHome = tool 'mysonarscanner4'
-            }
-
+        stage('Kubernetes helm') {
             steps {
-                withSonarQubeEnv('sonar-pro') {
-                    sh '''${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=vprofile \
-                   -Dsonar.projectName=vprofile-repo \
-                   -Dsonar.projectVersion=1.0 \
-                   -Dsonar.sources=src/ \
-                   -Dsonar.java.binaries=target/test-classes/com/visualpathit/account/controllerTest/ \
-                   -Dsonar.junit.reportsPath=target/surefire-reports/ \
-                   -Dsonar.jacoco.reportsPath=target/jacoco.exec \
-                   -Dsonar.java.checkstyle.reportPaths=target/checkstyle-result.xml'''
-                }
-
-                timeout(time: 10, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
-        }
-        stage('Kubernetes Deploy') {
-	  agent { label 'KOPS' }
-            steps {
-                    sh "helm upgrade --install --force vproifle-stack helm/vprofilecharts --set appimage=${registry}:${BUILD_NUMBER} --namespace prod"
+                    sh "helm upgrade --install --force vproifle-stack helm/vprofilecharts --set appimage=$registry:V$BUILD_NUMBER --namespace prod"
             }
         }
 
