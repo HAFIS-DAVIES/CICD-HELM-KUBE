@@ -12,19 +12,20 @@ pipeline {
         DOCKERHUB_CREDENTIALS=credentials('dockerhub')
     }
 
-    stages{
+    stages {
 
-        stage('BUILD'){
+        stage('Build Artifact'){
             steps {
-                sh 'mvn clean install -DskipTests'
+                sh 'mvn -s settings.xml -DskipTests install'
             }
             post {
                 success {
-                    echo 'Now Archiving...'
-                    archiveArtifacts artifacts: '**/target/*.war'
+                    echo "Now Archiving."
+                    archiveArtifacts artifacts: "**/*.war"
                 }
             }
         }
+        
 
         stage('UNIT TEST'){
             steps {
