@@ -78,7 +78,7 @@ pipeline {
           }
 	}
 
-	 stage(kubernetes kops ) {
+	 stage('kubernetes kops ') {
 	  steps{
             sh 'kubectl apply -f . --namespace staging'
         }
