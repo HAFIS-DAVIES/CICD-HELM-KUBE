@@ -16,7 +16,7 @@ pipeline {
 
         stage('Build Artifact'){
             steps {
-                sh 'mvn -s settings.xml -DskipTests install'
+                sh 'mvn clean install -DskipTests'
             }
             post {
                 success {
